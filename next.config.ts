@@ -1,7 +1,17 @@
-import type { NextConfig } from "next";
+import { NextConfig } from 'next'
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
+const config: NextConfig = {
+  images: {
+    domains: ['images.unsplash.com'],
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'https://resume-generator-production.up.railway.app/:path*',
+      },
+    ]
+  },
+}
 
-export default nextConfig;
+export default config
