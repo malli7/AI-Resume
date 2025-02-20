@@ -63,7 +63,7 @@ function App() {
 
             {/* Trust Indicators */}
             <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center animate-fadeIn">
-              <TrustIndicator icon={<Users className="w-6 h-6" />} number="2M+" text="Users" />
+              <TrustIndicator icon={<Users className="w-6 h-6" />} number="10K+" text="Users" />
               <TrustIndicator icon={<Star className="w-6 h-6" />} number="4.9/5" text="Rating" />
               <TrustIndicator icon={<TrendingUp className="w-6 h-6" />} number="93%" text="Success Rate" />
               <TrustIndicator icon={<Shield className="w-6 h-6" />} number="100%" text="ATS Friendly" />
@@ -232,7 +232,7 @@ function App() {
               Ready to Transform Your Career?
             </h2>
             <p className="text-xl mb-12 text-black/90">
-              {"Join over 2 million professionals who've trusted ResumeAI to advance their careers."}
+              {"Join over 10 thousand professionals who've trusted ResumeAI to advance their careers."}
             </p>
             <div className="flex flex-col md:flex-row gap-6 justify-center">
               <Link href={"/dashboard"} className="group bg-white text-blue-600 px-8 py-4 rounded-full text-lg font-semibold hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center">
