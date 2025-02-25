@@ -87,7 +87,7 @@ export default function Onboarding({ isEdit }: { isEdit: boolean }) {
         employment_period: "",
         location: "",
         industry: "",
-        key_responsibilities: [""],
+        key_responsibilities: "",
       },
     ],
     certifications: [
@@ -105,6 +105,26 @@ export default function Onboarding({ isEdit }: { isEdit: boolean }) {
       Version_Control: [""],
     },
   });
+
+  const [rawSkills, setRawSkills] = useState<{ [key: string]: string }>({
+    Programming_Languages: "",
+    Frameworks: "",
+    Databases: "",
+    Cloud_Services: "",
+    DevOps_CI_CD: "",
+    Version_Control: "",
+  });
+
+  useEffect(() => {
+    if (isEdit) {
+      const initialSkills = Object.keys(formData.skills).reduce((acc, skillCategory) => {
+        acc[skillCategory as keyof Skills] = formData.skills[skillCategory as keyof Skills].join(", ");
+        return acc;
+      }, {} as { [key in keyof Skills]: string });
+
+      setRawSkills(initialSkills);
+    }
+  }, [formData.skills, isEdit]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -211,7 +231,17 @@ export default function Onboarding({ isEdit }: { isEdit: boolean }) {
       return;
     }
     try {
-      const cleanedData = formData;
+      const cleanedData = {
+        ...formData,
+        skills: Object.keys(formData.skills).reduce((acc, skillCategory) => {
+          const skillsArray = rawSkills[skillCategory]
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean); // Filter only when saving
+          acc[skillCategory] = skillsArray;
+          return acc;
+        }, {} as { [key: string]: string[] }),
+      };
       console.log(cleanedData);
       const resumesRef = collection(db, "resumes");
       const docRef = doc(resumesRef, userEmail);
@@ -712,13 +742,11 @@ export default function Onboarding({ isEdit }: { isEdit: boolean }) {
                       </label>
                       <textarea
                         required
-                        value={exp.key_responsibilities.join("\n")}
+                        value={exp.key_responsibilities}
                         onChange={(e) => {
-                          const responsibilities = e.target.value
-                            .split("\n")
-                            .filter((r) => r.trim());
+                          const responsibilities = e.target.value;
                           handleChange(
-                            { target: { value: responsibilities.join(", ") } } as React.ChangeEvent<HTMLTextAreaElement>,
+                            { target: { value: responsibilities } } as unknown as React.ChangeEvent<HTMLTextAreaElement>,
                             "experience_details",
                             index,
                             "key_responsibilities"
@@ -832,24 +860,16 @@ export default function Onboarding({ isEdit }: { isEdit: boolean }) {
                     <label className="block font-medium capitalize mb-2 text-gray-700">
                       {skillCategory.replace(/_/g, " ")}
                     </label>
-                    <textarea
-                      value={formData.skills[
-                        skillCategory as keyof Skills
-                      ].join(", ")}
+                    <input
+                      type="text"
+                      value={rawSkills[skillCategory as keyof Skills] || ""}
                       onChange={(e) => {
-                        const skills = e.target.value
-                          .split(",")
-                          .map((s) => s.trim())
-                          .filter(Boolean);
-                        setFormData((prev) => ({
+                        setRawSkills((prev) => ({
                           ...prev,
-                          skills: {
-                            ...prev.skills,
-                            [skillCategory]: skills,
-                          },
+                          [skillCategory]: e.target.value,
                         }));
                       }}
-                      className="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[100px] transition-all"
+                      className="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder={
                         skillCategory === "Programming_Languages"
                           ? "JavaScript, TypeScript, Python, Java, C++"
