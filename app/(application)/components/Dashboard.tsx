@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { db } from "@/firebase";
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import {  doc, getDoc, updateDoc } from "firebase/firestore";
 import { motion } from "framer-motion";
 import { FileText, Download, Eye, Pencil, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
