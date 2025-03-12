@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { db } from "@/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { motion } from "framer-motion";
-import { FileText, Download, Eye, Pencil } from "lucide-react";
+import { FileText, Download, Eye, Pencil, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -100,7 +100,11 @@ const Dashboard = () => {
             <UserProfile userData={userData} user={user as User | null} />
             <UserStats userData={userData} />
           </div>
-          <ResumeList resumes={userData?.resumes} />
+          <ResumeList
+            resumes={userData?.resumes}
+            setUserData={setUserData}
+            userId={user?.id || ""}
+          />
         </div>
       </main>
     </div>
@@ -179,8 +183,12 @@ const UserStats = ({ userData }: { userData: UserProfile }) => (
 
 const ResumeList = ({
   resumes,
+  userId,
+  setUserData,
 }: {
   resumes: Record<string, string> | undefined;
+  userId: string;
+  setUserData: (userData: UserProfile) => void;
 }) => {
   const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
   const router = useRouter();
@@ -206,14 +214,71 @@ const ResumeList = ({
     }
   };
 
+  const handleDelete = async (filename: string) => {
+    try {
+      const docRef = doc(db, "users", userId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const userData = docSnap.data() as UserProfile;
+        const updatedResumes = { ...userData.resumes };
+        delete updatedResumes[filename];
+        await updateDoc(docRef, { resumes: updatedResumes });
+        setUserData({ ...userData, resumes: updatedResumes });
+      }
+
+      // Hit the delete endpoint
+      const response = await fetch(`/api/delete-resume?filename=${filename}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to delete resume: ${response.statusText} (Status: ${response.status})`
+        );
+      }
+    } catch (error) {
+      console.error("Error deleting resume:", error);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    try {
+      const docRef = doc(db, "users", userId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const userData = docSnap.data() as UserProfile;
+        const updatedResumes = {};
+        await updateDoc(docRef, { resumes: updatedResumes });
+        setUserData({ ...userData, resumes: updatedResumes });
+
+        // Hit the delete endpoint for each resume
+        const deletePromises = Object.keys(userData.resumes).map((filename) =>
+          fetch(`/api/delete-resume?filename=${filename}`, {
+            method: "DELETE",
+          })
+        );
+        await Promise.all(deletePromises);
+      }
+    } catch (error) {
+      console.error("Error deleting all resumes:", error);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Your Resumes</CardTitle>
-          <Button onClick={() => router.push("/generate")}>
-            Create New Resume
-          </Button>
+          <div className="flex space-x-2">
+            <Button onClick={() => router.push("/generate")}>
+              Create New Resume
+            </Button>
+            {resumes && Object.entries(resumes).length > 0 && (
+              <Button variant="destructive" onClick={handleDeleteAll}>
+                Delete All
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -270,6 +335,14 @@ const ResumeList = ({
                       >
                         <Download className="h-4 w-4 mr-1" />
                         Download
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDelete(key)}
+                      >
+                        <Trash className="h-4 w-4 mr-1" />
+                        Delete
                       </Button>
                     </div>
                   </CardContent>
