@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { db } from "@/firebase";
-import {  doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { motion } from "framer-motion";
 import { FileText, Download, Eye, Pencil, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ type UserProfile = {
   firstName: string;
   lastName: string;
   resumes: Record<string, string>;
+  coverLetters: Record<string, string>;
 };
 
 const Dashboard = () => {
@@ -37,6 +38,7 @@ const Dashboard = () => {
     firstName: "",
     lastName: "",
     resumes: {},
+    coverLetters: {},
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,8 +102,9 @@ const Dashboard = () => {
             <UserProfile userData={userData} user={user as User | null} />
             <UserStats userData={userData} />
           </div>
-          <ResumeList
+          <DocumentList
             resumes={userData?.resumes}
+            coverLetters={userData?.coverLetters}
             setUserData={setUserData}
             userId={user?.id || ""}
           />
@@ -161,13 +164,21 @@ const UserStats = ({ userData }: { userData: UserProfile }) => (
       <CardTitle>Account Statistics</CardTitle>
     </CardHeader>
     <CardContent>
-      <dl className="grid gap-4 sm:grid-cols-2">
+      <dl className="grid gap-4 sm:grid-cols-3">
         <div>
           <dt className="text-sm font-medium text-muted-foreground">
             Total Resumes
           </dt>
           <dd className="text-2xl font-bold">
             {Object.keys(userData?.resumes || {}).length}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-sm font-medium text-muted-foreground">
+            Total Cover Letters
+          </dt>
+          <dd className="text-2xl font-bold">
+            {Object.keys(userData?.coverLetters || {}).length}
           </dd>
         </div>
         <div>
@@ -181,16 +192,21 @@ const UserStats = ({ userData }: { userData: UserProfile }) => (
   </Card>
 );
 
-const ResumeList = ({
+const DocumentList = ({
   resumes,
+  coverLetters,
   userId,
   setUserData,
 }: {
   resumes: Record<string, string> | undefined;
+  coverLetters: Record<string, string> | undefined;
   userId: string;
   setUserData: (userData: UserProfile) => void;
 }) => {
   const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"resumes" | "coverLetters">(
+    "resumes"
+  );
   const router = useRouter();
 
   const fetchPdfAndSetUrl = async (pdfUrl: string) => {
@@ -214,7 +230,7 @@ const ResumeList = ({
     }
   };
 
-  const handleDelete = async (filename: string) => {
+  const handleDeleteResume = async (filename: string) => {
     try {
       const docRef = doc(db, "users", userId);
       const docSnap = await getDoc(docRef);
@@ -227,7 +243,7 @@ const ResumeList = ({
       }
 
       // Hit the delete endpoint
-      const response = await fetch(`/api/delete-resume?filename=${filename}`, {
+      const response = await fetch(`/api/delete_resume?filename=${filename}`, {
         method: "DELETE",
       });
 
@@ -241,7 +257,37 @@ const ResumeList = ({
     }
   };
 
-  const handleDeleteAll = async () => {
+  const handleDeleteCoverLetter = async (filename: string) => {
+    try {
+      const docRef = doc(db, "users", userId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const userData = docSnap.data() as UserProfile;
+        const updatedCoverLetters = { ...userData.coverLetters };
+        delete updatedCoverLetters[filename];
+        await updateDoc(docRef, { coverLetters: updatedCoverLetters });
+        setUserData({ ...userData, coverLetters: updatedCoverLetters });
+      }
+
+      // Hit the delete endpoint
+      const response = await fetch(
+        `/api/delete_cover_letter?filename=${filename}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to delete cover letter: ${response.statusText} (Status: ${response.status})`
+        );
+      }
+    } catch (error) {
+      console.error("Error deleting cover letter:", error);
+    }
+  };
+
+  const handleDeleteAllResumes = async () => {
     try {
       const docRef = doc(db, "users", userId);
       const docSnap = await getDoc(docRef);
@@ -253,7 +299,7 @@ const ResumeList = ({
 
         // Hit the delete endpoint for each resume
         const deletePromises = Object.keys(userData.resumes).map((filename) =>
-          fetch(`/api/delete-resume?filename=${filename}`, {
+          fetch(`/api/delete_resume?filename=${filename}`, {
             method: "DELETE",
           })
         );
@@ -264,98 +310,245 @@ const ResumeList = ({
     }
   };
 
+  const handleDeleteAllCoverLetters = async () => {
+    try {
+      const docRef = doc(db, "users", userId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const userData = docSnap.data() as UserProfile;
+        const updatedCoverLetters = {};
+        await updateDoc(docRef, { coverLetters: updatedCoverLetters });
+        setUserData({ ...userData, coverLetters: updatedCoverLetters });
+
+        // Hit the delete endpoint for each cover letter
+        const deletePromises = Object.keys(userData.coverLetters).map(
+          (filename) =>
+            fetch(`/api/delete_cover_letter?filename=${filename}`, {
+              method: "DELETE",
+            })
+        );
+        await Promise.all(deletePromises);
+      }
+    } catch (error) {
+      console.error("Error deleting all cover letters:", error);
+    }
+  };
+
+  const renderContent = () => {
+    if (activeTab === "resumes") {
+      return resumes && Object.entries(resumes).length > 0 ? (
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(resumes).map(([key, value]) => (
+            <motion.li
+              key={key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card>
+                <CardContent className="flex flex-col items-center p-4">
+                  <FileText className="h-12 w-12 text-blue-500 mb-2" />
+                  <h3 className="font-bold text-center mb-2">{key}</h3>
+                  <div className="flex space-x-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const pdfUrl = `/api/download_resume?filename=${value}`;
+                            fetchPdfAndSetUrl(pdfUrl);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl w-full h-[90vh] p-0 flex flex-col">
+                        <DialogHeader className="p-2 m-0">
+                          <DialogTitle>{key}</DialogTitle>
+                        </DialogHeader>
+                        <div className="w-full p-0 m-0 flex-1">
+                          <iframe
+                            src={selectedPdf || ""}
+                            className="w-full h-full"
+                            title={`Resume: ${key}`}
+                          />
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        window.open(
+                          `/api/download_resume?filename=${value}`,
+                          "_blank"
+                        )
+                      }
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Download
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeleteResume(key)}
+                    >
+                      <Trash className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-center text-muted-foreground">
+          Wow, no resumes? Impressive.
+          <br />
+          {"Guess it's time to create your first one before world domination, huh?"}
+        </p>
+      );
+    } else {
+      return coverLetters && Object.entries(coverLetters).length > 0 ? (
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(coverLetters).map(([key, value]) => (
+            <motion.li
+              key={key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card>
+                <CardContent className="flex flex-col items-center p-4">
+                  <FileText className="h-12 w-12 text-green-500 mb-2" />
+                  <h3 className="font-bold text-center mb-2">{key}</h3>
+                  <div className="flex space-x-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const pdfUrl = `/api/download_cover_letter?filename=${value}`;
+                            fetchPdfAndSetUrl(pdfUrl);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl w-full h-[90vh] p-0 flex flex-col">
+                        <DialogHeader className="p-2 m-0">
+                          <DialogTitle>{key}</DialogTitle>
+                        </DialogHeader>
+                        <div className="w-full p-0 m-0 flex-1">
+                          <iframe
+                            src={selectedPdf || ""}
+                            className="w-full h-full"
+                            title={`Cover Letter: ${key}`}
+                          />
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        window.open(
+                          `/api/download_cover_letter?filename=${value}`,
+                          "_blank"
+                        )
+                      }
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Download
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeleteCoverLetter(key)}
+                    >
+                      <Trash className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-center text-muted-foreground">
+          No cover letters? Bold move.
+          <br /> {"I'm sure hiring managers will telepathically sense your brilliance. Or, you know... you could just create one."}
+        </p>
+      );
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle>Your Resumes</CardTitle>
-          <div className="flex space-x-2">
-            <Button onClick={() => router.push("/generate")}>
-              Create New Resume
-            </Button>
-            {resumes && Object.entries(resumes).length > 0 && (
-              <Button variant="destructive" onClick={handleDeleteAll}>
-                Delete All
+        <div className="flex flex-col space-y-4 sm:flex-row sm:justify-between sm:items-center sm:space-y-0">
+          <div>
+            <CardTitle>Your Documents</CardTitle>
+          </div>
+          <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+            {activeTab === "resumes" ? (
+              <Button onClick={() => router.push("/generate")}>
+                Create New Resume
+              </Button>
+            ) : (
+              <Button onClick={() => router.push("/generate")}>
+                Create New Cover Letter
               </Button>
             )}
+            {activeTab === "resumes" &&
+              resumes &&
+              Object.entries(resumes).length > 0 && (
+                <Button variant="destructive" onClick={handleDeleteAllResumes}>
+                  Delete All
+                </Button>
+              )}
+            {activeTab === "coverLetters" &&
+              coverLetters &&
+              Object.entries(coverLetters).length > 0 && (
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteAllCoverLetters}
+                >
+                  Delete All
+                </Button>
+              )}
           </div>
         </div>
+        <div className="flex border-b mt-4">
+          <button
+            className={`px-4 py-2 font-medium ${
+              activeTab === "resumes"
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+            }`}
+            onClick={() => setActiveTab("resumes")}
+          >
+            Resumes
+          </button>
+          <button
+            className={`px-4 py-2 font-medium ${
+              activeTab === "coverLetters"
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+            }`}
+            onClick={() => setActiveTab("coverLetters")}
+          >
+            Cover Letters
+          </button>
+        </div>
       </CardHeader>
-      <CardContent>
-        {resumes && Object.entries(resumes).length > 0 ? (
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Object.entries(resumes).map(([key, value]) => (
-              <motion.li
-                key={key}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card>
-                  <CardContent className="flex flex-col items-center p-4">
-                    <FileText className="h-12 w-12 text-blue-500 mb-2" />
-                    <h3 className="font-bold text-center mb-2">{key}</h3>
-                    <div className="flex space-x-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const pdfUrl = `/api/download_resume?filename=${value}`;
-                              fetchPdfAndSetUrl(pdfUrl);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl w-full h-[90vh] p-0 flex flex-col">
-                          <DialogHeader className="p-2 m-0">
-                            <DialogTitle>{key}</DialogTitle>
-                          </DialogHeader>
-                          <div className="w-full p-0 m-0 flex-1">
-                            <iframe
-                              src={selectedPdf || ""}
-                              className="w-full h-full"
-                              title={`Resume: ${key}`}
-                            />
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          window.open(
-                            `/api/download_resume?filename=${value}`,
-                            "_blank"
-                          )
-                        }
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDelete(key)}
-                      >
-                        <Trash className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-center text-muted-foreground">
-            No resumes found. Create your first resume to get started!
-          </p>
-        )}
-      </CardContent>
+      <CardContent className="pt-4">{renderContent()}</CardContent>
     </Card>
   );
 };
@@ -399,9 +592,14 @@ const DashboardSkeleton = () => (
             </CardContent>
           </Card>
         </div>
+        {/* Combined Document List Skeleton */}
         <Card>
           <CardHeader>
             <Skeleton className="h-6 w-28" />
+            <div className="flex border-b mt-4">
+              <Skeleton className="h-10 w-24 mr-4" />
+              <Skeleton className="h-10 w-24" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -411,6 +609,7 @@ const DashboardSkeleton = () => (
                     <Skeleton className="h-12 w-12 rounded mb-2" />
                     <Skeleton className="h-4 w-24 mb-2" />
                     <div className="flex space-x-2">
+                      <Skeleton className="h-8 w-16" />
                       <Skeleton className="h-8 w-16" />
                       <Skeleton className="h-8 w-16" />
                     </div>

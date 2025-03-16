@@ -1,4 +1,3 @@
-// bot.ts (or app/actions/storeUser.ts)
 import { db } from "@/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 

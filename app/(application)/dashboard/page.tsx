@@ -4,8 +4,8 @@ import { collection, getDoc, doc } from "firebase/firestore";
 import { db } from "@/firebase";
 import { useUser } from "@clerk/clerk-react";
 import { motion } from "framer-motion";
-import Dashboard from "../components/Dashboard";
 import Onboarding from "../components/Onboarding";
+import Dashboard from "../components/Dashboard";
 
 export default function Home() {
   const { user } = useUser();
