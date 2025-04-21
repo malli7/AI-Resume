@@ -393,7 +393,7 @@ const DocumentList = ({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleDeleteResume(key)}
+                      onClick={() => handleDeleteResume(value)}
                     >
                       <Trash className="h-4 w-4 mr-1" />
                       Delete
