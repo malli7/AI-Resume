@@ -230,14 +230,14 @@ const DocumentList = ({
     }
   };
 
-  const handleDeleteResume = async (filename: string) => {
+  const handleDeleteResume = async (key:string,filename: string) => {
     try {
       const docRef = doc(db, "users", userId);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const userData = docSnap.data() as UserProfile;
         const updatedResumes = { ...userData.resumes };
-        delete updatedResumes[filename];
+        delete updatedResumes[key];
         await updateDoc(docRef, { resumes: updatedResumes });
         setUserData({ ...userData, resumes: updatedResumes });
       }
@@ -257,14 +257,14 @@ const DocumentList = ({
     }
   };
 
-  const handleDeleteCoverLetter = async (filename: string) => {
+  const handleDeleteCoverLetter = async (key:string,filename: string) => {
     try {
       const docRef = doc(db, "users", userId);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const userData = docSnap.data() as UserProfile;
         const updatedCoverLetters = { ...userData.coverLetters };
-        delete updatedCoverLetters[filename];
+        delete updatedCoverLetters[key];
         await updateDoc(docRef, { coverLetters: updatedCoverLetters });
         setUserData({ ...userData, coverLetters: updatedCoverLetters });
       }
@@ -393,7 +393,7 @@ const DocumentList = ({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleDeleteResume(value)}
+                      onClick={() => handleDeleteResume(key,value)}
                     >
                       <Trash className="h-4 w-4 mr-1" />
                       Delete
@@ -469,7 +469,7 @@ const DocumentList = ({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleDeleteCoverLetter(value)}
+                      onClick={() => handleDeleteCoverLetter(key,value)}
                     >
                       <Trash className="h-4 w-4 mr-1" />
                       Delete
